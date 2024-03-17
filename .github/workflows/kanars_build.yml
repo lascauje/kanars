@@ -1,0 +1,49 @@
+name: kanars-build
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  rust-build:
+    strategy:
+      matrix:
+        # Waiting for Apple silicon dev support (pip, cargo, etc.)
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Lint
+      run: |
+        cd kanars
+        cargo fmt
+        cargo clippy -- -W clippy::all -W clippy::pedantic
+    - name: UnitTest
+      run: |
+        cd kanars
+        cargo test
+
+  python-build:
+    strategy:
+      matrix:
+        # Waiting for Apple silicon dev support (pip, cargo, etc.)
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Lint
+      run: |
+        pip install mypy==1.9.0 ruff==0.3.3
+        ruff format --check
+        ruff check
+        mypy --disallow-untyped-defs --ignore-missing-imports .
+    - name: UnitTest
+      run: |
+        pip install maturin==1.5.0 matplotlib==3.8.3 scikit-learn==1.4.1.post1 pytest==8.1.1
+        cd kanars
+        maturin build --release
+        pip install target/wheels/*.whl
+        cd -
+        pytest

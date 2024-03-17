@@ -1,0 +1,5 @@
+__pycache__/
+Cargo.lock
+target/
+test_kanars.dot
+test_kanars_*.png

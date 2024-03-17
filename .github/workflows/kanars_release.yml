@@ -1,0 +1,66 @@
+name: kanars-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release_job:
+    name: Release Job
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.release_id.outputs.upload_url }}
+    steps:
+      - name: Release Step
+        id: release_id
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: Happy New Release
+          draft: false
+          prerelease: false
+
+  python-wheels:
+    needs: release_job
+    strategy:
+      matrix:
+        # Waiting for Apple silicon dev support (pip, cargo, etc.)
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build
+      id: build
+      run: |
+        pip install maturin==1.5.0
+        cd kanars
+        maturin build --release
+        cd -
+
+    - name: Artifact
+      id: artifact_id
+      run: |
+        ARTIFACT_NAME=$(find kanars/target/wheels -name '*.whl' -exec basename {} \;)
+        echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ steps.artifact_id.outputs.artifact_name }}
+        path: kanars/target/wheels/${{ steps.artifact_id.outputs.artifact_name }}
+
+    - name: Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release_job.outputs.upload_url }}
+        asset_name: ${{ steps.artifact_id.outputs.artifact_name }}
+        asset_path: kanars/target/wheels/${{ steps.artifact_id.outputs.artifact_name }}
+        asset_content_type: application/zip
